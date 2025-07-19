@@ -1,0 +1,272 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  name          String
+  email         String    @unique
+  password      String
+  phone         String
+  role_id       Int
+  role          Role      @relation(fields: [role_id], references: [id])
+  avatar_url    String?
+  signature_url String?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+  deleted       Boolean   @default(false)
+
+  Workflow Workflow[]
+
+  Documents Documents[]
+
+  Workflow_type Workflow_type[]
+
+  Stages Stages[]
+
+  Document_workflow Document_workflow[]
+
+  Document_versions Document_versions[]
+}
+
+model Role {
+  id          Int                    @id @default(autoincrement())
+  name        String                 @unique
+  description String
+  User        User[]
+  permissions Role_has_permissions[]
+  created_at  DateTime               @default(now())
+  updated_at  DateTime               @updatedAt
+  deleted_at  DateTime?
+  deleted     Boolean                @default(false)
+
+  Stages Stages[]
+}
+
+model Permission {
+  id          Int                    @id @default(autoincrement())
+  name        String                 @unique
+  description String
+  role        Role_has_permissions[]
+  created_at  DateTime               @default(now())
+  updated_at  DateTime               @updatedAt
+  deleted_at  DateTime?
+  deleted     Boolean                @default(false)
+}
+
+model Role_has_permissions {
+  id            Int        @id @default(autoincrement())
+  role_id       Int
+  permission_id Int
+  role          Role       @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  permission    Permission @relation(fields: [permission_id], references: [id], onDelete: Cascade)
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @updatedAt
+  deleted_at    DateTime?
+  deleted       Boolean    @default(false)
+
+  @@unique([role_id, permission_id]) // Add this line
+}
+
+// Define the Status enum
+enum Status {
+  Created
+  Accepted
+  Rejected
+  Review
+  Reviewed
+  Opened
+  Completed
+}
+
+enum Node_type {
+  Start
+  Intermediate
+  End
+}
+
+enum Stages_type {
+  Draft
+  Signature
+  Review
+  Finish
+}
+
+// Enum for input types
+enum InputType {
+  Text
+  PhoneNumber
+  Number
+  Signature
+}
+
+model Workflow_type {
+  id            Int    @id @default(autoincrement())
+  name          String @unique
+  description   String
+  created_by_id Int
+  created_by    User?  @relation(fields: [created_by_id], references: [id])
+
+  Workflow Workflow[]
+
+  Documents Documents[]
+}
+
+model Workflow {
+  id               Int            @id @default(autoincrement())
+  name             String         @unique
+  description      String
+  workflow_type_id Int
+  workflow_type    Workflow_type? @relation(fields: [workflow_type_id], references: [id])
+  created_by_id    Int
+  created_by       User?          @relation(fields: [created_by_id], references: [id])
+  created_at       DateTime       @default(now())
+  updated_at       DateTime       @updatedAt
+  deleted_at       DateTime?
+  deleted          Boolean        @default(false)
+
+  Documents Documents[]
+
+  Stages Stages[]
+}
+
+model Stages {
+  id              Int         @id @default(autoincrement())
+  name            String
+  description     String
+  sequence        Int?        @default(0)
+  action_required Boolean
+  workflow_id     Int
+  workflow        Workflow    @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
+  action_by_id    Int
+  action_by       User?       @relation(fields: [action_by_id], references: [id])
+  role_id         Int
+  role            Role?       @relation(fields: [role_id], references: [id])
+  status          Status      @default(Created)
+  node_stage      Node_type   @default(Start)
+  stage_type      Stages_type @default(Draft)
+  next_stage_id   Int?
+  node_position_x String
+  node_position_y String
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+  deleted_at      DateTime?
+
+  // @@unique([sequence, workflow_id])
+}
+
+enum docStatus {
+  Created
+  InTransition
+  Review
+  Rejected
+  Completed
+}
+
+model Documents {
+  id               Int           @id @default(autoincrement())
+  name             String
+  current_version  Int
+  workflow_stages  Json
+  workflow_type_id Int
+  workflow_type    Workflow_type @relation(fields: [workflow_type_id], references: [id])
+  filename         String
+  file_url         String
+  file_size        Int
+  file_type        String
+  current_stage    Int
+  created_by_id    Int
+  status           docStatus     @default(Created)
+  created_by       User?         @relation(fields: [created_by_id], references: [id])
+  created_at       DateTime      @default(now())
+  updated_at       DateTime      @updatedAt
+  deleted_at       DateTime?
+  deleted          Boolean       @default(false)
+
+  Document_versions Document_versions[]
+  Workflow          Workflow?           @relation(fields: [workflowId], references: [id])
+  workflowId        Int?
+
+  Document_workflow Document_workflow[]
+
+  Document_fields Document_fields[]
+}
+
+model DocumentSiganatures {
+  id             Int      @id @default(autoincrement())
+  document_id    Int      @unique
+  signature_data Json
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+}
+
+model Document_versions {
+  id            Int        @id @default(autoincrement())
+  document_id   Int
+  document      Documents? @relation(fields: [document_id], references: [id])
+  version       Int
+  content       String?
+  file_url      String
+  created_by_id Int
+  created_by    User?      @relation(fields: [created_by_id], references: [id])
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @updatedAt
+  deleted_at    DateTime?
+  deleted       Boolean    @default(false)
+}
+
+model Document_fields {
+  id          Int       @id @default(autoincrement())
+  document_id Int       @unique
+  document    Documents @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  doc_data    Json?
+  // field_name    String    @unique
+  // field_type    String
+  // page_number   Int
+  // field_label   String
+  // x_coordinates Int
+  // y_coordinates Int
+  // font_size     Int?
+  // width         Int?
+  // height        Int?
+  // stages        Int
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  deleted_at  DateTime?
+  deleted     Boolean   @default(false)
+}
+
+model Document_workflow {
+  id                Int       @id @default(autoincrement())
+  document_id       Int
+  document          Documents @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  workflow_stage_id Int
+  status            Status    @default(Created)
+  created_by_id     Int
+  created_by        User?     @relation(fields: [created_by_id], references: [id])
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+  deleted_at        DateTime?
+  deleted           Boolean   @default(false)
+}
+
+model Audit_logs {
+  id           Int      @id @default(autoincrement())
+  document_id  Int
+  action       String
+  performed_by BigInt
+  timestamp    DateTime
+  detail       String?
+}
